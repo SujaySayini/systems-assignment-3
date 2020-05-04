@@ -37,9 +37,9 @@ int string_equal(char *arg1, char *arg2)
 void configure(char* IP_address, char* port){
     int fd = open(".configure", O_RDWR | O_CREAT | O_TRUNC, 00744);
     //strcat(IP_address, " ");
-    write(fd,IP_address, strlen(IP_address));
+    write(fd,IP_address, sizeof(IP_address));
     write(fd," ", 1);
-    write(fd,port, strlen(port));
+    write(fd,port, sizeof(port));
     write(fd,"\n",1);
     close(fd);
 }

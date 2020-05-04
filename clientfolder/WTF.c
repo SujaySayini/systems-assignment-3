@@ -15,6 +15,7 @@
 #include <libgen.h>
 #include <dirent.h>
 #include <netdb.h> 
+#include <arpa/inet.h>
 
 #define true 1
 #define false 0
@@ -51,10 +52,10 @@ void checkout(int sockfd, char* project_name){
 
 void create(int sockfd, char* project_name){
     char message[1+strlen(project_name)];
-    message[0] = 'c'; //telling it here that we are creating our project
-    strcat(message,project_name);
+    bzero(message,strlen(message));
+    sprintf(message,"%c1:%d:%s;",'c',strlen(project_name),project_name);
     write(sockfd,message,strlen(message));
-
+    printf("%s\n",message);
     char c;
     read(sockfd,&c,1);
     if(c == 'e'){ // e for error 
@@ -147,7 +148,7 @@ int main(int argc, char **argv){
     servaddr.sin_family = AF_INET; 
     servaddr.sin_addr.s_addr = inet_addr(ip); 
     servaddr.sin_port = htons(port_in_int); 
-
+    printf("%dtest %s\n",servaddr.sin_addr.s_addr,ip);
     if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0) { 
         printf("Connection with the server failed.\n"); 
         return -1;
@@ -173,6 +174,7 @@ int main(int argc, char **argv){
     } else if (string_equal(argv[1], "push")){
 
     } else if (string_equal(argv[1], "create")){
+        printf("testss\n");
         int project_fd = open(argv[2],O_RDWR);
         if(project_fd>0){
             printf("Project already exists on client side.");

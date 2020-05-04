@@ -32,24 +32,13 @@ int string_equal(char *arg1, char *arg2)
     return true;
 }
   
-void create(int connfd) { 
-
-    char folder[100];
+void create(int connfd,char ** arguments) { 
+    char* folder;
     char c = ' ';
     int i = 0;
     int read_status;
-
-    do {
-        read_status = read(connfd, &c, 1);
-        if(read_status == 0){ // reached the end of the file
-            break;
-        }
-        folder[i] = c;
-        i++;
-    
-    }while(read_status > 0);
-    folder[i] = '\0';
-
+    folder = arguments[0];
+    printf("%s\n",folder);
     DIR* directory = opendir("./");
     struct dirent* currentElement = NULL;
     currentElement = readdir(directory);
@@ -58,9 +47,10 @@ void create(int connfd) {
              if(string_equal(currentElement->d_name,folder) == 0){
                     printf("Directory already exists.\n");
                     write(connfd,"e",1);
-                    return -1;
+                    return;
              }
          } 
+         currentElement = readdir(directory);
     }
     write(connfd, "m",1); // letting the client know that we made the folder 
     mkdir(folder, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); // create our own project on the client side
@@ -73,11 +63,54 @@ void create(int connfd) {
 } 
 void switcher(void* connfd_in_voidptr){
     int connfd = *((int*)connfd_in_voidptr);
-    char c;
-    read(connfd,&c,1);
-    if(c == 'c'){ //create
-        create(connfd);
-    } else if (c == 'o'){
+    char** arguments;
+    char command = ' ';
+    char args[50];
+    char c = ' ';
+    int i = 0;
+    int a = 0;
+    int tracker = 0;
+    int read_status;
+    read(connfd,&command,1);
+    while(true){
+        read(connfd,&c,1);
+        if(c == ':') break; 
+        args[i] = c;
+        i++;
+    }
+    args[i] = '\0';
+    i = 0;
+    arguments = (char**)malloc(sizeof(char*) * atoi(args));
+    char length[50];
+    int found_length = 0;
+    for(a;a < atoi(args);a++){
+        while(true){
+            read(connfd,&c,1);
+            if(c == ':'){
+                length[i] = '\0';
+                i = 0;
+                break;
+            }; 
+            length[i] = c;
+            i++;
+        }
+        int b = 0;
+        arguments[a] = (char*)malloc(sizeof(char) * atoi(length));
+        while(true){
+            read(connfd,&c,1);
+            if(c == ':' || c == ';'){
+                arguments[a][b] = '\0';
+                b = 0;
+                break;
+            }
+            arguments[a][b] = c;
+            b++;
+        }
+
+    }
+    if(command == 'c'){ //create
+        create(connfd,arguments);
+    } else if (command == 'o'){
 
     }
 }
