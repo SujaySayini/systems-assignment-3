@@ -121,7 +121,137 @@ void create(int connfd,char ** arguments) {
     closedir(directory);
 
 } 
+
+void send_files(int connfd, char* folder_name){
+    DIR* directory = opendir(folder_name);
+    struct dirent* currentElement = NULL;
+    readdir(directory);
+    readdir(directory);
+    currentElement = readdir(directory);
+    while(currentElement != NULL){
+        if(currentElement->d_type == 4){ //if its a directory
+
+
+            char file[strlen(folder_name)+1+strlen(currentElement->d_name)];
+            bzero(file, strlen(file));
+            strcat(file, file);
+            strcat(file, "/");
+            strcat(file, currentElement->d_name);
+            send_files(connfd, currentElement->d_name);
+        }
+        if(currentElement->d_type == 8){ //if its a file 
+
+        }
+    }
+
+}
+
+void checkout(int connfd){
+    char folder[100];
+
+
+
+    DIR* directory = opendir("./");
+    struct dirent* currentElement = NULL;
+    currentElement = readdir(directory);
+    while(currentElement != NULL){
+         if(currentElement->d_type == 4){ //if its a directory
+            if(string_equal(currentElement->d_name,folder) == 0){
+                //found the directory
+                write(connfd,"m",1); //m for made, letting client know that we found directory on server side 
+                
+                char file[2+strlen(currentElement->d_name)];
+                bzero(file, strlen(file));
+                file[0] = '.';
+                file[1] = '/';
+                strcat(file, currentElement->d_name);
+                send_files(connfd, file);
+                
+                write(connfd,":",1); // finished going through every file in the directory
+            }
+         } 
+         currentElement = readdir(directory);
+    }
+
+}
+
+void rollback(int connfd){
+    char folder[100];
+
+    DIR* directory = opendir("./");
+    struct dirent* currentElement = NULL;
+    currentElement = readdir(directory);
+    while(currentElement != NULL){
+        if(currentElement->d_type == 4){
+            if(string_equal(currentElement->d_name,folder) == 0){
+                chdir(folder);
+                int manifestfd = open("./.Manifest", O_RDWR, S_IRWXU);
+                // get all files that are in this manifest how idk?
+                // Only revert the files on the server
+            }
+        } 
+        currentElement = readdir(directory);
+    }
+
+    printf("Directory doesn't exists.\n");
+    write(connfd,"e",1);
+    return -1;
+
+}
+
+void delete_files(char* folder_name){
+    DIR* directory = opendir(folder_name);
+    struct dirent* currentElement = NULL;
+    readdir(directory);
+    readdir(directory);
+    currentElement = readdir(directory);
+    while(currentElement != NULL){
+        if(currentElement->d_type == 4){ //if its a directory
+            
+            char file[strlen(folder_name)+1+strlen(currentElement->d_name)];
+            bzero(file, strlen(file));
+            strcat(file, folder_name);
+            if(!(string_equal("./",folder_name))){
+                strcat(file, "/");
+            }
+            strcat(file, currentElement->d_name);
+            delete_files(currentElement->d_name);
+            rmdir(currentElement->d_name);
+        }
+        if(currentElement->d_type == 8){ //if its a file 
+            remove(currentElement->d_name);
+        }
+    }
+
+}
+
+void destroy (int connfd){
+    char folder[100];
+
+    DIR* directory = opendir("./");
+    struct dirent* currentElement = NULL;
+    currentElement = readdir(directory);
+    while(currentElement != NULL){
+         if(currentElement->d_type == 4){
+             if(string_equal(currentElement->d_name,folder) == 0){
+                   //found the directory
+                   // need to lock directory, expire any commits, delete files
+
+                   delete_files("./");
+                   write(connfd,"s",1); // return success that we finished everything above
+             }
+         } 
+         currentElement = readdir(directory);
+    }
+
+    printf("Directory doesn't exists.\n");
+    write(connfd,"e",1);
+    return -1;
+
+}
+
 void switcher(void* connfd_in_voidptr){
+    
     int connfd = *((int*)connfd_in_voidptr);
     char** arguments;
     char command = ' ';
@@ -171,8 +301,19 @@ void switcher(void* connfd_in_voidptr){
     }
     if(command == 'c'){ //create
         create(connfd,arguments);
+<<<<<<< HEAD
     } else if (command == 'u'){
         upload(connfd,arguments);
+=======
+    } else if (command == 'o'){ //checkout
+
+    } else if(command == 'r'){ // rollback
+        rollback(connfd);
+    } else if(command == 'd'){ // destroy 
+        destroy(connfd);
+    }else if(command == ' '){
+    
+>>>>>>> d26cc5fe1811fd0592bfb61c72ed5154ef7af3b3
     }
 }
 
