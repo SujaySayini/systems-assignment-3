@@ -57,9 +57,9 @@ void create(int connfd,char ** arguments) {
     chdir(folder);
     int manifestfd = open("./.Manifest", O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
     write(manifestfd,"0\n",2);
+    chdir("..");
     close(manifestfd);
     closedir(directory);
-
 } 
 
 void send_files(int connfd, char* folder_name){
@@ -70,7 +70,7 @@ void send_files(int connfd, char* folder_name){
     currentElement = readdir(directory);
     while(currentElement != NULL){
         if(currentElement->d_type == 4){ //if its a directory
-
+            //send directory here
 
             char file[strlen(folder_name)+1+strlen(currentElement->d_name)];
             bzero(file, strlen(file));
@@ -80,16 +80,14 @@ void send_files(int connfd, char* folder_name){
             send_files(connfd, currentElement->d_name);
         }
         if(currentElement->d_type == 8){ //if its a file 
-
+            //send files here
         }
     }
 
 }
 
-void checkout(int connfd){
-    char folder[100];
-
-
+void checkout(int connfd, char** arguments ){
+    char* folder = arguments[0];
 
     DIR* directory = opendir("./");
     struct dirent* currentElement = NULL;
@@ -107,16 +105,19 @@ void checkout(int connfd){
                 strcat(file, currentElement->d_name);
                 send_files(connfd, file);
                 
-                write(connfd,":",1); // finished going through every file in the directory
+                write(connfd,";",1); // finished going through every file in the directory
+                return ;
             }
          } 
          currentElement = readdir(directory);
     }
-
+    printf("Directory doesn't exists.\n");
+    write(connfd,"e",1);
+    return -1;
 }
 
-void rollback(int connfd){
-    char folder[100];
+void rollback(int connfd, char ** arguments){
+    char* folder = arguments[0];
 
     DIR* directory = opendir("./");
     struct dirent* currentElement = NULL;
@@ -162,11 +163,10 @@ void delete_files(char* folder_name){
             remove(currentElement->d_name);
         }
     }
-
 }
 
-void destroy (int connfd){
-    char folder[100];
+void destroy (int connfd, char** arguments){
+    char* folder = arguments[0];
 
     DIR* directory = opendir("./");
     struct dirent* currentElement = NULL;
@@ -174,11 +174,12 @@ void destroy (int connfd){
     while(currentElement != NULL){
          if(currentElement->d_type == 4){
              if(string_equal(currentElement->d_name,folder) == 0){
-                   //found the directory
+                   // found the directory
                    // need to lock directory, expire any commits, delete files
 
                    delete_files("./");
                    write(connfd,"s",1); // return success that we finished everything above
+                   return ;
              }
          } 
          currentElement = readdir(directory);
@@ -187,7 +188,6 @@ void destroy (int connfd){
     printf("Directory doesn't exists.\n");
     write(connfd,"e",1);
     return -1;
-
 }
 
 void switcher(void* connfd_in_voidptr){
@@ -241,11 +241,11 @@ void switcher(void* connfd_in_voidptr){
     if(command == 'c'){ //create
         create(connfd,arguments);
     } else if (command == 'o'){ //checkout
-
+        checkout(connfd,arguments);
     } else if(command == 'r'){ // rollback
-        rollback(connfd);
+        rollback(connfd, arguments);
     } else if(command == 'd'){ // destroy 
-        destroy(connfd);
+        destroy(connfd, arguments);
     }else if(command == ' '){
     
     }
