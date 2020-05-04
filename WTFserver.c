@@ -4,9 +4,19 @@
 #include <stdlib.h> 
 #include <string.h> 
 #include <sys/socket.h> 
-#include <sys/types.h> 
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 #define MAX 80 
   
+void readFile(char* f,char* buff){
+    int fd = open(f,O_RDONLY);
+    int size = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+    buff = (char*)malloc(sizeof(char) * size);
+}
+    
+
 // Function designed for chat between client and server. 
 void func(int sockfd) 
 { 
