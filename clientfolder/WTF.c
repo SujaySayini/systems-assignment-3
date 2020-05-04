@@ -45,6 +45,20 @@ void configure(char* IP_address, char* port){
 }
 
 void checkout(int sockfd, char* project_name){
+    char message[1+strlen(project_name)];
+    message[0] = 'o'; // telling checkout here
+
+    strcat(message,project_name);
+    write(sockfd,message,strlen(message));
+
+    char c;
+    read(sockfd,&c,1);
+    if(c == 'e'){ // e for error 
+        printf("Error, project doesn't exists on the server");
+    } else if (c == 'm'){ // m for made 
+        
+    
+    }
 
 
 }
@@ -75,6 +89,31 @@ void add(int sockfd, char* project_name, char* file_name){
 }
 void removefd(int sockfd, char* project_name, char* file_name){
 
+
+}
+void update(int sockfd, char* project_name){
+
+}
+void upgrade(int sockfd, char* project_name){
+
+}
+void commit(int sockfd, char* project_name){
+
+}
+void push(int sockfd, char* project_name){
+
+}
+void destroy(int sockfd, char* project_name){
+
+}
+void current_version(int sockfd, char* project_name){
+
+}
+void history(int sockfd, char* project_name){
+
+}
+
+void rollback(int sockfd, char* project_name, int version){
 
 }
 
@@ -157,30 +196,33 @@ int main(int argc, char **argv){
     }
 
     if (string_equal(argv[1], "checkout")){ 
-        int project_fd = open(argv[2],O_RDWR);
-        if(project_fd>0){
-            printf("Project already exists on client side.");
-            return -1;
-        }
+        DIR* directory = opendir("./");
+        struct dirent* currentElement = NULL;
+        currentElement = readdir(directory);
+        while(currentElement != NULL){
+            if(currentElement->d_type == 4){
+                if(string_equal(currentElement->d_name,argv[2]) == 0){
+                    printf("Directory already exists on the client side.\n");
+                    return -1;
+                }
+            } 
+        currentElement = readdir(directory);
+    }
         checkout(sockfd, argv[2]);
 
     } else if (string_equal(argv[1], "update")){
-
+        update(sockfd, argv[2]);
     } else if (string_equal(argv[1], "upgrade")){
-
+        upgrade(sockfd, argv[2]);
     } else if (string_equal(argv[1], "commit")){
-
+        commit(sockfd, argv[2]);
     } else if (string_equal(argv[1], "push")){
-
+        push(sockfd, argv[2]);
     } else if (string_equal(argv[1], "create")){
-        int project_fd = open(argv[2],O_RDWR);
-        if(project_fd>0){
-            printf("Project already exists on client side.");
-            return -1;
-        }
         create(sockfd,argv[2]);
 
     } else if (string_equal(argv[1], "destroy")){
+        destroy(sockfd, argv[2]);
 
     } else if (string_equal(argv[1], "add")){
         add(sockfd, argv[2], argv[3]);
@@ -189,8 +231,10 @@ int main(int argc, char **argv){
         removefd(sockfd, argv[2], argv[3]);
 
     } else if (string_equal(argv[1], "currentversion")){
+        current_version(sockfd, argv[2]);
 
     } else if (string_equal(argv[1], "history")){
+        history(sockfd, argv[2]);
 
     } else if (string_equal(argv[1], "rollback")){
         int version = atoi(argv[3]);
@@ -198,6 +242,7 @@ int main(int argc, char **argv){
             printf("Invalid number, please try again.\n");
             return -1;
         }
+        rollback(sockfd, argv[2], version);
 
     } else {
         printf("Invalid command, please try again.\n");
