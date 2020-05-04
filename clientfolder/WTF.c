@@ -16,9 +16,42 @@
 #include <dirent.h>
 #include <netdb.h> 
 #include <arpa/inet.h>
+#include <openssl/sha.h>
 
 #define true 1
 #define false 0
+
+
+int r_file(char * path,char** buff){
+    struct stat stats;
+    int read_status = 0;
+    stat(path,&stats);
+    int bytesReadSoFar = 0, numOfBytes = stats.st_size;
+    *buff = (char*)malloc(sizeof(char) * stats.st_size);
+    int fileD = open(path, O_RDONLY); 
+    do
+    {
+        read_status = read(fileD, *(buff + bytesReadSoFar), numOfBytes - bytesReadSoFar);
+        bytesReadSoFar += read_status;
+
+    } while (read_status > 0 && bytesReadSoFar < numOfBytes);  
+    if(read_status > 0)
+        return stats.st_size;
+    return read_status;
+
+}
+
+char* getHash(char* buff){
+    unsigned char *d = SHA256(buff, strlen(buff), 0);
+    int i;
+    printf("%s contents\n",buff);
+    char* hash = (char*)malloc(sizeof(char) * SHA256_DIGEST_LENGTH * 2 + 1);
+    for (i = 0; i < SHA256_DIGEST_LENGTH; i++){ 
+        sprintf(hash + 2*i,"%02x", d[i]);
+    }
+    hash[2 * SHA256_DIGEST_LENGTH + 1] = '\0';
+    return hash;
+}
 
 int string_equal(char *arg1, char *arg2)
 {
@@ -61,9 +94,20 @@ void checkout(int sockfd, char* project_name){
     }
 }
 
+void upload(int sockfd,char* file_path){
+    printf("upload\n");
+    char* content;
+    r_file(file_path,&content);
+    char* message = (char*)(malloc(sizeof(char) * 12 + strlen(file_path) + strlen(content)));
+    sprintf(message,"u2:%d:%s:%d:%s;",strlen(file_path),file_path,strlen(content),content);
+    printf("%s\n",message);
+    write(sockfd,message,strlen(message));
+}
+
 void create(int sockfd, char* project_name){
     char* len = strlen(project_name);
     char message[5+strlen(project_name)+strlen(len)];
+    //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
     bzero(message,strlen(message));
     sprintf(message,"%c1:%d:%s;",'c',strlen(project_name),project_name);
     write(sockfd,message,strlen(message));
@@ -77,14 +121,28 @@ void create(int sockfd, char* project_name){
         mkdir(project_name, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); // create our own project on the client side
         chdir(project_name);
         int manifestfd = open("./.Manifest", O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
+        chdir("..");
         write(manifestfd,"0\n",2);
         close(manifestfd);
         closedir(directory);
     }
 }
 void add(int sockfd, char* project_name, char* file_name){
-
-
+    char file_path[80] = {};
+    char manifest_path[80] = {};
+    sprintf(manifest_path,"./%s/.Manifest",project_name);
+    printf("%s\n",manifest_path);
+    int fd = open(manifest_path, O_CREAT | O_APPEND | O_RDWR, S_IRWXU);
+    sprintf(file_path,"./%s/%s",project_name,file_name);
+    char* file_content;
+    char* hash; 
+    r_file(file_path,&file_content);
+    hash = getHash(file_content);
+    char towrite[255] = {};
+    sprintf(towrite,"0 %s %s\n",file_path,hash);
+    printf("%s\n",towrite);
+    write(fd,towrite,strlen(towrite));
+    free(hash);
 }
 void removefd(int sockfd, char* project_name, char* file_name){
 
@@ -185,7 +243,6 @@ int main(int argc, char **argv){
     servaddr.sin_family = AF_INET; 
     servaddr.sin_addr.s_addr = inet_addr(ip); 
     servaddr.sin_port = htons(port_in_int); 
-    printf("%dtest %s\n",servaddr.sin_addr.s_addr,ip);
     if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0) { 
         printf("Connection with the server failed.\n"); 
         return -1;
@@ -216,6 +273,7 @@ int main(int argc, char **argv){
     } else if (string_equal(argv[1], "commit")){
         commit(sockfd, argv[2]);
     } else if (string_equal(argv[1], "push")){
+        upload(sockfd,"testersmile/lol.txt");       
         push(sockfd, argv[2]);
     } else if (string_equal(argv[1], "create")){
         create(sockfd,argv[2]);
@@ -224,6 +282,8 @@ int main(int argc, char **argv){
         destroy(sockfd, argv[2]);
 
     } else if (string_equal(argv[1], "add")){
+        printf("adding\n");
+
         add(sockfd, argv[2], argv[3]);
 
     } else if (string_equal(argv[1], "remove")){
