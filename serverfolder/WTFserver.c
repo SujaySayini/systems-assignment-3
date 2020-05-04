@@ -12,6 +12,7 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <errno.h>
 
 #define true 1
 #define false 0
@@ -31,7 +32,63 @@ int string_equal(char *arg1, char *arg2)
     }
     return true;
 }
-  
+
+int r_file(char * path,char** buff){
+    struct stat stats;
+    int read_status = 0;
+    stat(path,&stats);
+    int bytesReadSoFar = 0, numOfBytes = stats.st_size;
+    *buff = (char*)malloc(sizeof(char*) * stats.st_size);
+    int fileD = open(path, O_RDONLY); 
+    do
+    {
+        read_status = read(fileD, *(buff + bytesReadSoFar), numOfBytes - bytesReadSoFar);
+        bytesReadSoFar += read_status;
+
+    } while (read_status > 0 && bytesReadSoFar < numOfBytes);  
+    if(read_status > 0)
+        return stats.st_size;
+    return read_status;
+
+}
+
+void upload(int connfd,char** arguments){
+    //arg[0] = filepath
+    //arg[1] = file content
+    int depth = 0;
+    int i = 0;
+    int tracker = 0;
+    char holder[PATH_MAX];
+    printf("%s arg\n",arguments[0]);
+    while(i < strlen(arguments[0])){
+        printf("llooop\n");
+        if(arguments[0][i] == '/'){
+            holder[tracker] = '\0';
+            printf("status %d\n",mkdir(holder,0777));
+            depth++;
+            chdir(holder);
+            tracker = 0;
+            printf("%s %d\n",holder,depth);
+        }
+        else{
+            holder[tracker] = arguments[0][i];
+            tracker++;
+        }
+        i++;
+    }
+    holder[tracker] = '\0';
+    char final[100] = "./";
+    strcat(final,holder);
+    int fd = open(final, O_RDWR | O_TRUNC | O_CREAT, 0644);
+    printf("%s fd\n",arguments[1]);
+    perror("");
+    write(fd,arguments[1],strlen(arguments[1])); 
+    int a;
+    for(a = 0;a<depth;a++)
+        chdir("..");
+    
+}
+
 void create(int connfd,char ** arguments) { 
     char* folder;
     char c = ' ';
@@ -40,11 +97,13 @@ void create(int connfd,char ** arguments) {
     folder = arguments[0];
     printf("%s\n",folder);
     DIR* directory = opendir("./");
+    
     struct dirent* currentElement = NULL;
     currentElement = readdir(directory);
     while(currentElement != NULL){
          if(currentElement->d_type == 4){
-             if(string_equal(currentElement->d_name,folder) == 0){
+             printf("%s dir \n",currentElement->d_name);
+             if(string_equal(currentElement->d_name,folder) == 1){
                     printf("Directory already exists.\n");
                     write(connfd,"e",1);
                     return;
@@ -56,6 +115,7 @@ void create(int connfd,char ** arguments) {
     mkdir(folder, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); // create our own project on the client side
     chdir(folder);
     int manifestfd = open("./.Manifest", O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
+    chdir("..");
     write(manifestfd,"0\n",2);
     close(manifestfd);
     closedir(directory);
@@ -71,7 +131,8 @@ void switcher(void* connfd_in_voidptr){
     int a = 0;
     int tracker = 0;
     int read_status;
-    read(connfd,&command,1);
+    read(connfd,&c,1);
+    command = c;
     while(true){
         read(connfd,&c,1);
         if(c == ':') break; 
@@ -110,8 +171,8 @@ void switcher(void* connfd_in_voidptr){
     }
     if(command == 'c'){ //create
         create(connfd,arguments);
-    } else if (command == 'o'){
-
+    } else if (command == 'u'){
+        upload(connfd,arguments);
     }
 }
 
