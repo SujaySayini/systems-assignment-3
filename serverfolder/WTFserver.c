@@ -16,6 +16,7 @@
 
 #define true 1
 #define false 0
+#define PATH_MAX 100 
 
 int string_equal(char *arg1, char *arg2)
 {
@@ -234,12 +235,9 @@ void destroy (int connfd, char** arguments){
     while(currentElement != NULL){
          if(currentElement->d_type == 4){
              if(string_equal(currentElement->d_name,folder) == 0){
-                   // found the directory
-                   // need to lock directory, expire any commits, delete files
-
                    delete_files("./");
                    write(connfd,"s",1); // return success that we finished everything above
-                   return ;
+                   return;
              }
          } 
          currentElement = readdir(directory);
@@ -248,6 +246,35 @@ void destroy (int connfd, char** arguments){
     printf("Directory doesn't exists.\n");
     write(connfd,"e",1);
     return -1;
+}
+void history (int connfd, char** arguments){
+
+    char* folder = arguments[0];
+
+    DIR* directory = opendir("./");
+    struct dirent* currentElement = NULL;
+    currentElement = readdir(directory);
+    while(currentElement != NULL){
+         if(currentElement->d_type == 4){
+             if(string_equal(currentElement->d_name,folder) == 0){
+                   //project exists
+                   write(connfd,"s",1); // return success we found it
+                   // send  here all containing  the history of all operations performed on all pushes
+                   //format: version number and new line seperating pushes log of changes 
+                   return;
+             }
+         } 
+         currentElement = readdir(directory);
+    }
+
+    printf("Directory doesn't exists.\n");
+    write(connfd,"e",1);
+    return -1;
+}
+void current_version(int connfd, char** arguments){
+    char* folder = arguments[0];
+
+
 }
 
 void switcher(void* connfd_in_voidptr){
@@ -309,8 +336,10 @@ void switcher(void* connfd_in_voidptr){
         rollback(connfd, arguments);
     } else if(command == 'd'){ // destroy 
         destroy(connfd, arguments);
-    }else if(command == ' '){
-    
+    }else if (command == 'h'){ // history
+        history(connfd, arguments);
+    } else if (command == 'v'){ //current version
+        current_version(connfd, arguments);
     }
 }
 
