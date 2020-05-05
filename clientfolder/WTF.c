@@ -87,22 +87,19 @@ void configure(char* IP_address, char* port){
 }
 
 void checkout(int sockfd, char* project_name){
-    char message[1+strlen(project_name)];
-    message[0] = 'o'; // telling checkout here
-
-    strcat(message,project_name);
+    char* len = strlen(project_name);
+    char message[5+strlen(project_name)+strlen(len)];
+    bzero(message,strlen(message));
+    sprintf(message,"%c1:%d:%s;",'o',strlen(project_name),project_name);
     write(sockfd,message,strlen(message));
-
+    printf("%s\n",message);
     char c;
     read(sockfd,&c,1);
     if(c == 'e'){ // e for error 
-        printf("Error, project doesn't exists on the server");
-    } else if (c == 'm'){ // m for made 
-        
-    
+        printf("Error, project already exists on the server");
+    } else if (c == 'm'){ // made
+        //get all the files and directories here
     }
-
-
 }
 
 void upload(int sockfd,char* file_path){
@@ -118,7 +115,9 @@ void upload(int sockfd,char* file_path){
 }
 
 void create(int sockfd, char* project_name){
-    char* message = (char*)malloc(sizeof(char) * strlen(project_name));
+    char* len = strlen(project_name);
+    char message[5+strlen(project_name)+strlen(len)];
+    //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
     bzero(message,strlen(message));
     sprintf(message,"%c1:%d:%s;",'c',strlen(project_name),project_name);
     write(sockfd,message,strlen(message));
@@ -172,12 +171,54 @@ void push(int sockfd, char* project_name){
 
 }
 void destroy(int sockfd, char* project_name){
+    char* len = strlen(project_name);
+    char message[5+strlen(project_name)+strlen(len)];
+    //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
+    bzero(message,strlen(message));
+    sprintf(message,"%c1:%d:%s;",'d',strlen(project_name),project_name);
+    write(sockfd,message,strlen(message));
+    char c;
+    read(sockfd,&c,1);
+    if(c == 'e'){ // e for error 
+        printf("Error, project doesn't exist on the server");
+    } else if (c == 's'){ // success
+        printf("Sucessfully deleting files.\n");
+    }
 
 }
 void current_version(int sockfd, char* project_name){
+    char* len = strlen(project_name);
+    char message[5+strlen(project_name)+strlen(len)];
+    //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
+    bzero(message,strlen(message));
+    sprintf(message,"%c1:%d:%s;",'v',strlen(project_name),project_name);
+    write(sockfd,message,strlen(message));
+    char c;
+    read(sockfd,&c,1);
+    if(c == 'e'){ // e for error 
+        printf("Error, project doesn't exist on the server");
+    } else if (c == 's'){ // success
+        printf("Sucessfully deleting files.\n");
+    }
+
 
 }
 void history(int sockfd, char* project_name){
+
+    char* len = strlen(project_name);
+    char message[5+strlen(project_name)+strlen(len)];
+    //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
+    bzero(message,strlen(message));
+    sprintf(message,"%c1:%d:%s;",'h',strlen(project_name),project_name);
+    write(sockfd,message,strlen(message));
+    char c;
+    read(sockfd,&c,1);
+    if(c == 'e'){ // e for error 
+        printf("Error, project doesn't exist on the server");
+    } else if (c == 's'){ // success
+        //printf("Sucessfully deleting files.\n");
+        
+    }
 
 }
 
@@ -274,7 +315,7 @@ int main(int argc, char **argv){
                 }
             } 
         currentElement = readdir(directory);
-    }
+        }
         checkout(sockfd, argv[2]);
 
     } else if (string_equal(argv[1], "update")){
