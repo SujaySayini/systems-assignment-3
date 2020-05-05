@@ -9,14 +9,14 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <sys/stat.h>
 #include <pthread.h>
 #include <errno.h>
 
 #define true 1
 #define false 0
-#define PATH_MAX 100 
+//#define PATH_MAX 100 
 
 int string_equal(char *arg1, char *arg2)
 {
@@ -39,16 +39,17 @@ int r_file(char * path,char** buff){
     int read_status = 0;
     stat(path,&stats);
     int bytesReadSoFar = 0, numOfBytes = stats.st_size;
-    *buff = (char*)malloc(sizeof(char*) * stats.st_size);
-    bzero(*buff,stats.st_size);
-    *buff[stats.st_size] = '\0';
+    *buff = (char*)malloc(sizeof(char) * numOfBytes); //before sizeof(char*) ?
+    bzero(*buff,numOfBytes);
+    (*buff)[numOfBytes] = '\0';
     int fileD = open(path, O_RDONLY); 
     do
     {
         read_status = read(fileD, *(buff + bytesReadSoFar), numOfBytes - bytesReadSoFar);
         bytesReadSoFar += read_status;
 
-    } while (read_status > 0 && bytesReadSoFar < numOfBytes);  
+    } while (read_status > 0 && bytesReadSoFar < numOfBytes); 
+    printf("buff is %s\n", *buff); 
     if(read_status > 0)
         return stats.st_size;
     return read_status;
@@ -124,51 +125,89 @@ void create(int connfd,char ** arguments) {
     close(manifestfd);
     closedir(directory);
 } 
+void upload_files(int sockfd,char* file_path){
+    //printf("upload\n");
+    char* content;
+    r_file(file_path,&content);
+    printf("lol\n");
+    printf("contents is %s\n",content);
+    char* message = (char*)(malloc(sizeof(char) * 12 + strlen(file_path) + strlen(content)));
+    bzero(message,sizeof(char) * 12 + strlen(file_path) + strlen(content));
+    sprintf(message,"f2:%d:%s:%d:%s;",strlen(file_path),file_path,strlen(content),content);
+    printf("%s\n",message);
+    write(sockfd,message,strlen(message));
+}
 
 void send_files(int connfd, char* folder_name){
+    printf("folder name is %s\n", folder_name);
     DIR* directory = opendir(folder_name);
     struct dirent* currentElement = NULL;
     readdir(directory);
     readdir(directory);
     currentElement = readdir(directory);
     while(currentElement != NULL){
+        printf("current is %s\n", currentElement->d_name);
         if(currentElement->d_type == 4){ //if its a directory
             //send directory here
+            //write(connfd, 'd', 1);
+            //printf("current2 is %s\n", currentElement->d_name);
+            int len = strlen(currentElement->d_name);
+            char project_len[10];
+            sprintf(project_len,"%d",len);
+            char message[5+strlen(currentElement->d_name)+strlen(project_len)];
+            bzero(message,strlen(message));
+            sprintf(message,"%c1:%d:%s;",'d',strlen(currentElement->d_name),currentElement->d_name);
+            printf("message is %s\n", message);
+            write(connfd,message,strlen(message));
 
             char file[strlen(folder_name)+1+strlen(currentElement->d_name)];
             bzero(file, strlen(file));
-            strcat(file, file);
+            strcat(file, folder_name);
             strcat(file, "/");
             strcat(file, currentElement->d_name);
-            send_files(connfd, currentElement->d_name);
+            printf("file is %s\n", file);
+            send_files(connfd, file);
+
+            write(connfd, 'b',1); // tell the client to go back in pwd since we finished all th files in this directory
         }
         if(currentElement->d_type == 8){ //if its a file 
             //send files here
+            upload_files(connfd, currentElement->d_name);
         }
+        printf("Heloow finishi\n");
+        currentElement = readdir(directory);
     }
 
 }
 
 void checkout(int connfd, char** arguments ){
     char* folder = arguments[0];
-
+    //printf("Hellow\n");
+    //printf("%s\n", arguments[0]);
     DIR* directory = opendir("./");
     struct dirent* currentElement = NULL;
+    readdir(directory);
+    readdir(directory);
     currentElement = readdir(directory);
+    //printf("Hellow left \n");
     while(currentElement != NULL){
          if(currentElement->d_type == 4){ //if its a directory
-            if(string_equal(currentElement->d_name,folder) == 0){
+         //printf("Hello folder name is %s\n", currentElement->d_name);
+            //printf("folder name is %s\n", folder);
+            if(strcmp(currentElement->d_name,folder) == 0){
                 //found the directory
                 write(connfd,"m",1); //m for made, letting client know that we found directory on server side 
-                
+                //printf("Hello folder %s\n", currentElement->d_name);
+                //return 0;
                 char file[2+strlen(currentElement->d_name)];
                 bzero(file, strlen(file));
                 file[0] = '.';
                 file[1] = '/';
                 strcat(file, currentElement->d_name);
+                printf("Hello folder %s\n", file);
                 send_files(connfd, file);
                 
-                write(connfd,";",1); // finished going through every file in the directory
+                write(connfd,"&",1); // finished going through every file in the directory
                 return ;
             }
          } 
@@ -333,21 +372,17 @@ void switcher(void* connfd_in_voidptr){
     } else if (command == 'u'){
         upload(connfd,arguments);
     } else if (command == 'o'){ //checkout
+        printf("%s\n", arguments[0]);
+        //return -1;
         checkout(connfd,arguments);
     } else if(command == 'r'){ // rollback
         rollback(connfd, arguments);
     } else if(command == 'd'){ // destroy 
-<<<<<<< HEAD
-        destroy(connfd);
-    }else if(command == ' '){
-    
-=======
         destroy(connfd, arguments);
     }else if (command == 'h'){ // history
         history(connfd, arguments);
     } else if (command == 'v'){ //current version
         current_version(connfd, arguments);
->>>>>>> 16c77abea47f832cca1840b2fe0829494f440ca6
     }
 }
 

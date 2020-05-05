@@ -11,7 +11,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <math.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <libgen.h>
 #include <dirent.h>
 #include <netdb.h> 
@@ -20,6 +20,7 @@
 
 #define true 1
 #define false 0
+//#define PATH_MAX 100 
 
 
 int r_file(char * path,char** buff){
@@ -86,27 +87,144 @@ void configure(char* IP_address, char* port){
     close(fd);
 }
 
+void upload_files(int connfd,char** arguments){
+    //arg[0] = filepath
+    //arg[1] = file content
+    printf("data %s\n", arguments[1]);
+    int depth = 0;
+    int i = 0;
+    int tracker = 0;
+    char holder[PATH_MAX];
+    printf("%s arg\n",arguments[0]);
+    // while(i < strlen(arguments[0])){
+    //     printf("llooop\n");
+    //     printf("holder name is %s\n", holder);
+    //     if(arguments[0][i] == '/'){
+    //         holder[tracker] = '\0';
+    //         printf("status %d\n",mkdir(holder,0777));
+    //         depth++;
+    //         chdir(holder);
+    //         tracker = 0;
+    //         printf("%s %d\n",holder,depth);
+    //     }
+    //     else{
+    //         holder[tracker] = arguments[0][i];
+    //         tracker++;
+    //     }
+    //     i++;
+    // }
+    holder[tracker] = '\0';
+    char final[100] = "./";
+    //strcat(final,holder);
+    strcat(final,arguments[0]);
+    printf("final is %s\n", final);
+    int fd = open(final, O_RDWR | O_TRUNC | O_CREAT, 0644);
+    printf("%s fd\n",arguments[1]);
+    perror("");
+    write(fd,arguments[1],strlen(arguments[1])); 
+    int a;
+    for(a = 0;a<depth;a++)
+        chdir("..");
+    
+}
+
 void checkout(int sockfd, char* project_name){
-    char* len = strlen(project_name);
-    char message[5+strlen(project_name)+strlen(len)];
+    printf("%s\n", project_name);
+
+    int len = strlen(project_name); //10 - 2
+    char project_len[10];
+    sprintf(project_len,"%d",len);
+    char message[5+strlen(project_name)+strlen(project_len)];
+    //printf("Hello3\n");
     bzero(message,strlen(message));
+    printf("%d , %s\n", strlen(project_name), project_name);
     sprintf(message,"%c1:%d:%s;",'o',strlen(project_name),project_name);
     write(sockfd,message,strlen(message));
     printf("%s\n",message);
-    char c;
+    char c = ' ';
     read(sockfd,&c,1);
+    printf("Hello2\n");
     if(c == 'e'){ // e for error 
-        printf("Error, project already exists on the server");
+        printf("Error, project doesn't exist on the server");
     } else if (c == 'm'){ // made
+        //char command = read(sockfd,&c,1);
+        mkdir(project_name, 00700);
+        chdir(project_name);
         //get all the files and directories here
+        char command = ' ';
+       
+        while( command != '&'){ // ending
+            read(sockfd,&command,1);
+            if(command == 'b'){
+                chdir("..");
+                continue;
+            }
+            char** arguments;
+                char args[50];
+                char c = ' ';
+                int i = 0;
+                int a = 0;
+                int tracker = 0;
+                int read_status;
+                while(true){
+                    read(sockfd,&c,1);
+                    if(c == ':') break; 
+                    args[i] = c;
+                    i++;
+                }
+                args[i] = '\0';
+                i = 0;
+                arguments = (char**)malloc(sizeof(char*) * atoi(args));
+                char length[50];
+                int found_length = 0;
+                for(a;a < atoi(args);a++){
+                    while(true){
+                        read(sockfd,&c,1);
+                        if(c == ':'){
+                            length[i] = '\0';
+                            i = 0;
+                            break;
+                        }; 
+                        length[i] = c;
+                        i++;
+                    }
+                int b = 0;
+                arguments[a] = (char*)malloc(sizeof(char) * atoi(length));
+                while(true){
+                    read(sockfd,&c,1);
+                    if(c == ':' || c == ';'){
+                        arguments[a][b] = '\0';
+                        b = 0;
+                        break;
+                    }
+                    arguments[a][b] = c;
+                    b++;
+                    }
+                }  
+                printf("arguemnts %s\n", arguments[0]);
+                printf("enter command %c\n", command);
+                //return 0;
+            if(command == 'f'){ // if its a file 
+                printf("entered here\n");
+                upload_files(sockfd, arguments);
+            } else if(command == 'd'){ //if its a directory
+                char* path = arguments[0];
+                mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+                chdir(path);
+            } 
+            // if (command == 'b'){ // go back a directory
+            //     chdir("..");
+            // }
+            
+        }
     }
 }
 
 void upload(int sockfd,char* file_path){
-    printf("upload\n");
+    //printf("upload\n");
     char* content;
     r_file(file_path,&content);
-    printf("lol\n");
+    //printf("lol\n");
     char* message = (char*)(malloc(sizeof(char) * 12 + strlen(file_path) + strlen(content)));
     bzero(message,sizeof(char) * 12 + strlen(file_path) + strlen(content));
     sprintf(message,"u2:%d:%s:%d:%s;",strlen(file_path),file_path,strlen(content),content);
@@ -304,18 +422,20 @@ int main(int argc, char **argv){
     }
 
     if (string_equal(argv[1], "checkout")){ 
-        DIR* directory = opendir("./");
-        struct dirent* currentElement = NULL;
-        currentElement = readdir(directory);
-        while(currentElement != NULL){
-            if(currentElement->d_type == 4){
-                if(string_equal(currentElement->d_name,argv[2]) == 0){
-                    printf("Directory already exists on the client side.\n");
-                    return -1;
-                }
-            } 
-        currentElement = readdir(directory);
-        }
+        // DIR* directory = opendir("./");
+        // struct dirent* currentElement = NULL;
+        // currentElement = readdir(directory);
+        // while(currentElement != NULL){
+        //     if(currentElement->d_type == 4){
+        //         printf("%s and %s", argv[2], currentElement->d_name);
+        //         if(string_equal(currentElement->d_name,argv[2]) == 0){
+        //             printf("Directory already exists on the client side.11\n");
+        //             return -1;
+        //         }
+        //     } 
+        // currentElement = readdir(directory);
+        // }
+        printf("%s\n", argv[2]);
         checkout(sockfd, argv[2]);
 
     } else if (string_equal(argv[1], "update")){
