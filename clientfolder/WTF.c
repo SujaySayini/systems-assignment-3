@@ -27,17 +27,25 @@ int r_file(char * path,char** buff){
     int read_status = 0;
     stat(path,&stats);
     int bytesReadSoFar = 0, numOfBytes = stats.st_size;
-    *buff = (char*)malloc(sizeof(char) * stats.st_size);
+    
+    *buff = (char*)malloc(sizeof(char) * numOfBytes + 1);
+    bzero(*buff,numOfBytes);
+    (*buff)[numOfBytes] = '\0';
+    printf("%s %d\n",path,stats.st_size);
+    
     int fileD = open(path, O_RDONLY); 
     do
     {
         read_status = read(fileD, *(buff + bytesReadSoFar), numOfBytes - bytesReadSoFar);
         bytesReadSoFar += read_status;
 
-    } while (read_status > 0 && bytesReadSoFar < numOfBytes);  
+    } while (read_status > 0 && bytesReadSoFar < numOfBytes);
+    printf("%s",*buff);
     if(read_status > 0)
         return stats.st_size;
     return read_status;
+    /*
+    */
 
 }
 
@@ -101,7 +109,9 @@ void upload(int sockfd,char* file_path){
     printf("upload\n");
     char* content;
     r_file(file_path,&content);
+    printf("lol\n");
     char* message = (char*)(malloc(sizeof(char) * 12 + strlen(file_path) + strlen(content)));
+    bzero(message,sizeof(char) * 12 + strlen(file_path) + strlen(content));
     sprintf(message,"u2:%d:%s:%d:%s;",strlen(file_path),file_path,strlen(content),content);
     printf("%s\n",message);
     write(sockfd,message,strlen(message));
@@ -274,11 +284,8 @@ int main(int argc, char **argv){
     } else if (string_equal(argv[1], "commit")){
         commit(sockfd, argv[2]);
     } else if (string_equal(argv[1], "push")){
-<<<<<<< HEAD
         upload(sockfd,"testersmile/lol.txt");       
-=======
-        push(sockfd, argv[2]);
->>>>>>> d26cc5fe1811fd0592bfb61c72ed5154ef7af3b3
+        //push(sockfd, argv[2]);
     } else if (string_equal(argv[1], "create")){
         create(sockfd,argv[2]);
 

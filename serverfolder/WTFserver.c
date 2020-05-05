@@ -39,6 +39,8 @@ int r_file(char * path,char** buff){
     stat(path,&stats);
     int bytesReadSoFar = 0, numOfBytes = stats.st_size;
     *buff = (char*)malloc(sizeof(char*) * stats.st_size);
+    bzero(*buff,stats.st_size);
+    *buff[stats.st_size] = '\0';
     int fileD = open(path, O_RDONLY); 
     do
     {
@@ -301,10 +303,8 @@ void switcher(void* connfd_in_voidptr){
     }
     if(command == 'c'){ //create
         create(connfd,arguments);
-<<<<<<< HEAD
     } else if (command == 'u'){
         upload(connfd,arguments);
-=======
     } else if (command == 'o'){ //checkout
 
     } else if(command == 'r'){ // rollback
@@ -313,7 +313,6 @@ void switcher(void* connfd_in_voidptr){
         destroy(connfd);
     }else if(command == ' '){
     
->>>>>>> d26cc5fe1811fd0592bfb61c72ed5154ef7af3b3
     }
 }
 
