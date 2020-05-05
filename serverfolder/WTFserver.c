@@ -16,7 +16,7 @@
 
 #define true 1
 #define false 0
-#define PATH_MAX 100 
+//#define PATH_MAX 100 
 
 int string_equal(char *arg1, char *arg2)
 {
@@ -39,20 +39,34 @@ int r_file(char * path,char** buff){
     int read_status = 0;
     stat(path,&stats);
     int bytesReadSoFar = 0, numOfBytes = stats.st_size;
-    *buff = (char*)malloc(sizeof(char*) * stats.st_size);
-    bzero(*buff,stats.st_size);
-    *buff[stats.st_size] = '\0';
+    
+    *buff = (char*)malloc(sizeof(char) * numOfBytes + 1);
+    bzero(*buff,numOfBytes);
+    (*buff)[numOfBytes] = '\0';
+    printf("%s %d\n",path,stats.st_size);
+    
     int fileD = open(path, O_RDONLY); 
     do
     {
         read_status = read(fileD, *(buff + bytesReadSoFar), numOfBytes - bytesReadSoFar);
         bytesReadSoFar += read_status;
 
-    } while (read_status > 0 && bytesReadSoFar < numOfBytes);  
+    } while (read_status > 0 && bytesReadSoFar < numOfBytes);
+    printf("%s",*buff);
     if(read_status > 0)
         return stats.st_size;
     return read_status;
+    /*
+    */
 
+}
+
+void download(int connfd,char* filepath){
+    int fd = open(filepath,O_RDONLY);
+    if(fd < 0){
+        return;
+    };
+    write()
 }
 
 void upload(int connfd,char** arguments){
@@ -337,17 +351,13 @@ void switcher(void* connfd_in_voidptr){
     } else if(command == 'r'){ // rollback
         rollback(connfd, arguments);
     } else if(command == 'd'){ // destroy 
-<<<<<<< HEAD
         destroy(connfd);
     }else if(command == ' '){
-    
-=======
         destroy(connfd, arguments);
     }else if (command == 'h'){ // history
         history(connfd, arguments);
     } else if (command == 'v'){ //current version
         current_version(connfd, arguments);
->>>>>>> 16c77abea47f832cca1840b2fe0829494f440ca6
     }
 }
 
