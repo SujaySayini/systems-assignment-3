@@ -154,7 +154,12 @@ void checkout(int sockfd, char* project_name){
         char command = ' ';
        
         while( command != '&'){ // ending
+            
             read(sockfd,&command,1);
+            printf("command is %c\n", command);
+            if(command == '&'){
+                return;
+            }
             if(command == 'b'){
                 chdir("..");
                 continue;
@@ -217,6 +222,8 @@ void checkout(int sockfd, char* project_name){
             // }
             
         }
+        // printf("command is %c\n", command);
+        // return 0;
     }
 }
 
@@ -233,8 +240,10 @@ void upload(int sockfd,char* file_path){
 }
 
 void create(int sockfd, char* project_name){
-    char* len = strlen(project_name);
-    char message[5+strlen(project_name)+strlen(len)];
+    int len = strlen(project_name);
+    char project_len[10];
+    sprintf(project_len,"%d",len);
+    char message[5+strlen(project_name)+strlen(project_len)];
     //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
     bzero(message,strlen(message));
     sprintf(message,"%c1:%d:%s;",'c',strlen(project_name),project_name);
@@ -289,8 +298,10 @@ void push(int sockfd, char* project_name){
 
 }
 void destroy(int sockfd, char* project_name){
-    char* len = strlen(project_name);
-    char message[5+strlen(project_name)+strlen(len)];
+    int len = strlen(project_name);
+    char project_len[10];
+    sprintf(project_len,"%d",len);
+    char message[5+strlen(project_name)+strlen(project_len)];
     //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
     bzero(message,strlen(message));
     sprintf(message,"%c1:%d:%s;",'d',strlen(project_name),project_name);
@@ -305,37 +316,112 @@ void destroy(int sockfd, char* project_name){
 
 }
 void current_version(int sockfd, char* project_name){
-    char* len = strlen(project_name);
-    char message[5+strlen(project_name)+strlen(len)];
+    int len = strlen(project_name);
+    char project_len[10];
+    sprintf(project_len,"%d",len);
+    char message[5+strlen(project_name)+strlen(project_len)];
     //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
     bzero(message,strlen(message));
     sprintf(message,"%c1:%d:%s;",'v',strlen(project_name),project_name);
     write(sockfd,message,strlen(message));
-    char c;
+    char c = ' ';
     read(sockfd,&c,1);
+    //printf("c is %c\n", c);
     if(c == 'e'){ // e for error 
-        printf("Error, project doesn't exist on the server");
+        printf("Error, manifest doesn't exist on the server");
     } else if (c == 's'){ // success
-        printf("Sucessfully deleting files.\n");
+        //found manifest
+        //printf("Entered\n");
+        int read_status = 0;
+        while(1){
+            read_status = read(sockfd,&c,1);
+            // if(read_status == 0){
+            //     printf("\n");
+            //     return;
+            // }
+            if(c == '&'){
+                printf("\n");
+                return; //reached end of file
+            }
+            printf("%c",c);
+        }
     }
-
-
 }
 void history(int sockfd, char* project_name){
 
-    char* len = strlen(project_name);
-    char message[5+strlen(project_name)+strlen(len)];
+    int len = strlen(project_name);
+    char project_len[10];
+    sprintf(project_len,"%d",len);
+    char message[5+strlen(project_name)+strlen(project_len)];
     //char* message = (char*)malloc(sizeof(char) * strlen(project_name));
     bzero(message,strlen(message));
     sprintf(message,"%c1:%d:%s;",'h',strlen(project_name),project_name);
     write(sockfd,message,strlen(message));
-    char c;
+    char c = ' ';
     read(sockfd,&c,1);
     if(c == 'e'){ // e for error 
         printf("Error, project doesn't exist on the server");
     } else if (c == 's'){ // success
         //printf("Sucessfully deleting files.\n");
-        
+        int read_status = 0;
+        int if_number = 1;
+        char buffer[100];
+        bzero(buffer, strlen(buffer));
+        int i = 0;
+        char** dictionary;
+        dictionary = (char**)malloc(sizeof(char*) * 50);
+        int j;
+        for(j = 0; j<50;j++){
+            dictionary[j] = NULL;
+        }
+        while(1){
+            read_status = read(sockfd,&c,1);
+            //printf("c = %c\n", c);
+            // if(read_status == 0){
+            //     printf("\n");
+            //     return;
+            // }
+            if(c == '&'){
+                printf("\n");
+                return; //reached end of file
+            }
+
+            printf("%c",c);
+            if(c == ' '){
+                if(if_number == 1){
+                    memset(buffer, '\0', 100);
+                    i = 0;
+                    if_number = 0;
+                }
+                else if(if_number == 0){
+                    // int i = 0;
+                    int version = 1;
+                    // for(i = 0; i< 50; i++){
+                    // printf("i is -%s-\n",dictionary[i]);
+                    // // if(dictionary[i] == NULL){
+                    // //    printf("entered\n");
+                    // //     break;
+                    // // }
+                    // if(string_equal(dictionary[i], buffer)){
+                    //     version++;
+                    // }
+                    // }
+                    
+                    // dictionary[i] = (char*)malloc(sizeof(char) * strlen(buffer));
+                    // //printf("bufferr is %s\n", buffer);
+                    // dictionary[i] = buffer;
+                    printf("%d",version);
+                    memset(buffer, '\0', 100);
+                    i = 0;
+                    if_number = 1;
+                }
+                
+            }else {
+                buffer[i] = c;
+                i++;
+            }
+        }
+
     }
 
 }
@@ -367,7 +453,7 @@ int main(int argc, char **argv){
     char buffer[100];    
     
     do {
-        printf("buffer is = %s\n", buffer);
+        //printf("buffer is = %s\n", buffer);
         read_status = read(fd, &c, 1);
         if(read_status == 0){ // reached the end of the file
             break;
@@ -422,19 +508,22 @@ int main(int argc, char **argv){
     }
 
     if (string_equal(argv[1], "checkout")){ 
-        // DIR* directory = opendir("./");
-        // struct dirent* currentElement = NULL;
-        // currentElement = readdir(directory);
-        // while(currentElement != NULL){
-        //     if(currentElement->d_type == 4){
-        //         printf("%s and %s", argv[2], currentElement->d_name);
-        //         if(string_equal(currentElement->d_name,argv[2]) == 0){
-        //             printf("Directory already exists on the client side.11\n");
-        //             return -1;
-        //         }
-        //     } 
-        // currentElement = readdir(directory);
-        // }
+        DIR* directory = opendir("./");
+        struct dirent* currentElement = NULL;
+        readdir(directory);
+        readdir(directory);
+        currentElement = readdir(directory);
+        while(currentElement != NULL){
+            if(currentElement->d_type == 4){
+                
+                if(string_equal(argv[2],currentElement->d_name)){
+                    printf("'%s' and '%s'\n", argv[2], currentElement->d_name);
+                    printf("Directory already exists on the client side.11\n");
+                    return -1;
+                }
+            } 
+        currentElement = readdir(directory);
+        }
         printf("%s\n", argv[2]);
         checkout(sockfd, argv[2]);
 

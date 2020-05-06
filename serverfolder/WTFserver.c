@@ -125,10 +125,10 @@ void create(int connfd,char ** arguments) {
     close(manifestfd);
     closedir(directory);
 } 
-void upload_files(int sockfd,char* file_path){
+void upload_files(int sockfd,char* file_path, char* full_file_path){
     //printf("upload\n");
     char* content;
-    r_file(file_path,&content);
+    r_file(full_file_path,&content);
     printf("lol\n");
     printf("contents is %s\n",content);
     char* message = (char*)(malloc(sizeof(char) * 12 + strlen(file_path) + strlen(content)));
@@ -172,7 +172,12 @@ void send_files(int connfd, char* folder_name){
         }
         if(currentElement->d_type == 8){ //if its a file 
             //send files here
-            upload_files(connfd, currentElement->d_name);
+            char file[strlen(folder_name)+1+strlen(currentElement->d_name)];
+            bzero(file, strlen(file));
+            strcat(file, folder_name);
+            strcat(file, "/");
+            strcat(file, currentElement->d_name);
+            upload_files(connfd, currentElement->d_name, file);
         }
         printf("Heloow finishi\n");
         currentElement = readdir(directory);
@@ -206,7 +211,7 @@ void checkout(int connfd, char** arguments ){
                 strcat(file, currentElement->d_name);
                 printf("Hello folder %s\n", file);
                 send_files(connfd, file);
-                
+                printf("Got here\n");
                 write(connfd,"&",1); // finished going through every file in the directory
                 return ;
             }
@@ -291,31 +296,119 @@ void destroy (int connfd, char** arguments){
 void history (int connfd, char** arguments){
 
     char* folder = arguments[0];
-
-    DIR* directory = opendir("./");
-    struct dirent* currentElement = NULL;
-    currentElement = readdir(directory);
-    while(currentElement != NULL){
-         if(currentElement->d_type == 4){
-             if(string_equal(currentElement->d_name,folder) == 0){
-                   //project exists
-                   write(connfd,"s",1); // return success we found it
-                   // send  here all containing  the history of all operations performed on all pushes
-                   //format: version number and new line seperating pushes log of changes 
-                   return;
-             }
-         } 
-         currentElement = readdir(directory);
+    int success = chdir(folder);
+    if(success != 0){
+        printf("folder doesn't exist.\n");
+        write(connfd, 'e', 1);
+        return;
     }
+    int commitfd = open("./.Commit", O_RDWR, S_IRWXU);
+    if(commitfd < 0){
+        printf("Commit file doesn't exists.\n");
+        write(connfd, 'e', 1);
+        return -1;
+    }
+    write(connfd,"s",1); // return success we found it
 
-    printf("Directory doesn't exists.\n");
-    write(connfd,"e",1);
-    return -1;
+    // send  here all containing  the history of all operations performed on all pushes
+    //format: version number and new line seperating pushes log of changes 
+    char c = ' ';
+    int read_status = 0;
+    int i = 0;
+    char buffer[100];
+    bzero(buffer, strlen(buffer));
+    do {
+        //printf("buffer is = %s\n", buffer);
+        read_status = read(commitfd, &c, 1);
+        if(read_status == 0){ // reached the end of the file
+            break;
+        }
+
+        if(c == ' '){ // for type and file path
+            buffer[i] = ' ';
+            i = i+1;
+            buffer[i] = '\0';
+            write(connfd, buffer, strlen(buffer));
+            memset(buffer, '\0', 100);
+            i = 0;
+        } else if (c == '/'){
+            memset(buffer, '\0', 100);
+            i = 0;
+        }
+        else if (c == '\n'){
+            write(connfd,"\n",1);
+            memset(buffer, '\0', 100);
+            i = 0;
+        }
+        else {
+            buffer[i] = c;
+            i++;
+        }
+
+    }while(read_status > 0);
+
+    //buffer[i] = '\s0';
+    //printf("helow\n");
+    write(connfd, "&",1); //reached end of files
+    close(commitfd);
+    chdir("..");
+    return;
+
+
 }
 void current_version(int connfd, char** arguments){
     char* folder = arguments[0];
+    chdir(folder);
+    int manifestfd = open("./.Manifest", O_RDWR, S_IRWXU);
+    if(manifestfd < 0){
+        write(connfd, 'e', 1);
+        return -1;
+    }
+    write(connfd, "s",1); // success at finding manifest
+    char c = ' ';
+    read(manifestfd, &c, 1); // read the project version, dont need it
+    read(manifestfd, &c, 1); // read the newline, dont need it
 
+    int read_status = 0;
+    int i = 0;
+    char buffer[100];
+    bzero(buffer, strlen(buffer));
+    do {
+        //printf("buffer is = %s\n", buffer);
+        read_status = read(manifestfd, &c, 1);
+        if(read_status == 0){ // reached the end of the file
+            break;
+        }
 
+        if(c == ' '){ // for version number and file path
+            buffer[i] = ' ';
+            i = i+1;
+            buffer[i] = '\0';
+            write(connfd, buffer, strlen(buffer));
+            memset(buffer, '\0', 100);
+            i = 0;
+        } else if (c == '/'){
+            memset(buffer, '\0', 100);
+            i = 0;
+        }
+        else if (c == '\n'){
+            write(connfd,"\n",1);
+            memset(buffer, '\0', 100);
+            i = 0;
+        }
+        else {
+            buffer[i] = c;
+            i++;
+        }
+
+    }while(read_status > 0);
+
+    //buffer[i] = '\0';
+    printf("helow\n");
+    write(connfd, "&",1); //reached end of files
+    close(manifestfd);
+    chdir("..");
+    return;
 }
 
 void switcher(void* connfd_in_voidptr){
@@ -369,7 +462,7 @@ void switcher(void* connfd_in_voidptr){
     }
     if(command == 'c'){ //create
         create(connfd,arguments);
-    } else if (command == 'u'){
+    } else if (command == 'u'){ // upload
         upload(connfd,arguments);
     } else if (command == 'o'){ //checkout
         printf("%s\n", arguments[0]);
