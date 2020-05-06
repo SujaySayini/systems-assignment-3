@@ -1,14 +1,19 @@
 For our project, after compiling both client and server files, we can have the 
 server running on one terminal and we can have multiple client processes since we have multithreading on the server side. 
 The server will listen and accept any requests it receives. 
-Once it recieves the message from client, it will do one of the following, 
-1.
-2.
-3.
-4.
-5.
-6.
-7.
-8.
-9.
-10.
+Once it recieves the message from client, it will do one of the following: 
+1. Configure
+2. Checkout
+3. Update
+4. Upgrade
+5. Commit
+6. Push
+7. Create
+8. Destory
+9. Add
+10. Remove
+11. Current Version
+12. History
+13. Rollback
+The server will accept any of these options and then give the correct result.
+

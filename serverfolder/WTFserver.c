@@ -446,6 +446,86 @@ void current_version(int connfd, char** arguments){
     chdir("..");
     return;
 }
+void push(int connfd, char** arguments){
+
+
+}
+
+void update(int connfd, char ** arguments){
+
+}
+void commit(int clientfd){
+  char buffer[100];
+  char delim;
+  int digitsOfTitleLength = 0;
+  int i;
+  recv(clientfd, buffer, sizeof(buffer), MSG_PEEK);
+  for (i = 0; i < strlen(buffer); i++) {
+    if (buffer[i] == ':') break;
+    digitsOfTitleLength++;
+  }
+  char titleLength[digitsOfTitleLength];
+  bzero(titleLength, digitsOfTitleLength);
+  read(clientfd, titleLength, digitsOfTitleLength);
+ 
+  int titleLengthConv = atoi(titleLength);
+  char title[titleLengthConv];
+  title[titleLengthConv] = '\0';
+  bzero(title, titleLengthConv);
+ 
+  read(clientfd, &delim, 1);
+  read(clientfd, title, titleLengthConv);
+  DIR* directory = opendir("./");
+  struct dirent* file;
+  int found = 0;
+ 
+  while ((file = readdir(directory))) {
+    if (file->d_type == 4) {
+      if (strcmp(file->d_name, title) == 0) {//project name found
+     found = 1;
+     break;
+      }
+    }
+  }
+    if(found == 0){
+        write(clientfd, "e", 1);
+        return;
+    }else{//send .manifest to client
+        char pathMani[strlen(title) + strlen(".manifest") + 3];
+        sprintf(pathMani, "./%s/.manifest", title);//./title/.manifest
+        int fd = open(pathMani, O_RDONLY, 0744);
+       
+        int sz = lseek(fd, -1, SEEK_END);
+        lseek(fd, 0, SEEK_SET);
+ 
+        char temp[sz];
+        bzero(temp, sz);
+        temp[sz] ='\0';
+        char buf[sz+1];
+        read(fd, &temp, sz);
+        sprintf(buf, "s%s", temp);
+        write(clientfd, buf, sz+1);//send contents of entire .manifest file with "s" as leading char followed by size of .manifest
+    }
+   
+    int ct = 0;
+    char buf;
+    while(recv(clientfd,&buf,1, MSG_PEEK) != 0)ct++;//get size of incoming file form client
+   
+    char pl[ct];
+    bzero(pl, ct);
+    pl[ct] = '\0';
+ 
+    char pathComi[strlen(title) + strlen(".commit") + 3];
+    sprintf(pathComi, "./%s/.commit", title);
+    int cfd = open(pathComi, O_RDWR | O_CREAT, 0744);//create/open commit file in project dir
+ 
+    read(clientfd,&pl,ct);//read client commit into server commit
+    printf("Server: Client commit recieved successfully");
+    write(clientfd, "s",1);
+    return;
+   
+}
+
 
 void switcher(void* connfd_in_voidptr){
     
@@ -511,11 +591,16 @@ void switcher(void* connfd_in_voidptr){
         rollback(connfd, arguments);
     } else if(command == 'd'){ // destroy 
         destroy(connfd, arguments);
-    }else if(command == ' '){
+    }else if(command == 'p'){
+        push(connfd, arguments);
     }else if (command == 'h'){ // history
         history(connfd, arguments);
     } else if (command == 'v'){ //current version
         current_version(connfd, arguments);
+    } else if (command == 'a'){ //update
+        update(connfd, arguments);
+    } else if (command == ' '){
+        commit(connfd);
     }
 }
 

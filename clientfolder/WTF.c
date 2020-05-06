@@ -365,11 +365,131 @@ void removefd(int sockfd, char* project_name, char* file_name){
 
 
 }
-void update(int sockfd, char* project_name){
-
+void update (int sockfd, char* project_name) {
+  DIR* directory = opendir(project_name);
+  if (directory == NULL) {
+    printf("Error: %s could not be found on the client\n", project_name);
+    return;
+  }
+  int len = strlen(project_name);
+  char titleLength[1024];
+  sprintf(titleLength, "%d", len);
+  char request[1 + strlen(titleLength) + strlen(project_name)];
+  bzero(request, (1 + strlen(titleLength) + 1 + strlen(project_name)));
+  request[0] = 'u';
+  strcat(request, titleLength);
+  strcat(request, ":");
+  strcat(request, project_name);
+  write(sockfd, request, strlen(request));
+  //printf("%s\n", request);
+  char result;
+  read(sockfd, &result, 1);
+  if (result == 'e') {
+    printf("Error: %s could not be found on the server\n", project_name);
+  } else if (result == 's') {
+    char buff[1024];
+    char delim;
+    int digitsOfManSize = 0;
+    int i;
+    recv(sockfd, buff, sizeof(buff), MSG_PEEK);
+    for (i = 0; i < strlen(buff); i++) {
+      if (buff[i] == ':') break;
+      digitsOfManSize++;
+    }
+    char manSize[digitsOfManSize];
+    bzero(manSize, digitsOfManSize);
+    read(sockfd, manSize, digitsOfManSize);
+    int manSizeConv = atoi(manSize);
+    read(sockfd, &delim, 1);
+    int update = open(".update", O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
+    int clientManifestFD = open(".Manifest", O_RDONLY);
+    int clientSize = lseek(clientManifestFD, 0, SEEK_END);
+    lseek(clientManifestFD, 0, SEEK_SET);
+    char clientManVersion;
+    char serverManVersion;
+    read(sockfd, &clientManVersion, 1);
+    read(sockfd, &serverManVersion, 1);
+    if (clientManVersion == serverManVersion) {
+      return;
+    }
+    read(clientManifestFD, &clientManVersion, 1);
+    read(sockfd, &serverManVersion, 1);
+    bzero(buff, 1024);
+    char serverManifest[manSizeConv];
+    bzero(serverManifest, manSizeConv);
+    char clientManifest[clientSize];
+    bzero(clientManifest, clientSize);
+    read(sockfd, serverManifest, manSizeConv);
+    read(clientManifestFD, clientManifest, clientSize);
+    printf("\n\n%s\n\n%s\n\n", serverManifest, clientManifest);
+ 
+    close(update);
+    close(clientManifestFD);
+  }
+  return;
 }
-void commit(int sockfd, char* project_name){
-    download(sockfd,"project1/folder/test.txt","project1/test.txt");
+void update (int sockfd, char* projectName) {
+  DIR* directory = opendir(projectName);
+  if (directory == NULL) {
+    printf("Error: %s could not be found on the client\n", projectName);
+    return;
+  }
+  int len = strlen(projectName);
+  char titleLength[1024];
+  sprintf(titleLength, "%d", len);
+  char request[1 + strlen(titleLength) + strlen(projectName)];
+  bzero(request, (1 + strlen(titleLength) + 1 + strlen(projectName)));
+  request[0] = 'u';
+  strcat(request, titleLength);
+  strcat(request, ":");
+  strcat(request, projectName);
+  write(sockfd, request, strlen(request));
+  //printf("%s\n", request);
+  char result;
+  read(sockfd, &result, 1);
+  if (result == 'e') {
+    printf("Error: %s could not be found on the server\n", projectName);
+  } else if (result == 's') {
+    char buff[1024];
+    char delim;
+    int digitsOfManSize = 0;
+    int i;
+    recv(sockfd, buff, sizeof(buff), MSG_PEEK);
+    for (i = 0; i < strlen(buff); i++) {
+      if (buff[i] == ':') break;
+      digitsOfManSize++;
+    }
+    char manSize[digitsOfManSize];
+    bzero(manSize, digitsOfManSize);
+    read(sockfd, manSize, digitsOfManSize);
+    int manSizeConv = atoi(manSize);
+    read(sockfd, &delim, 1);
+    int update = open(".update", O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
+    int clientManifestFD = open(".Manifest", O_RDONLY);
+    int clientSize = lseek(clientManifestFD, 0, SEEK_END);
+    lseek(clientManifestFD, 0, SEEK_SET);
+    char clientManVersion;
+    char serverManVersion;
+    read(sockfd, &clientManVersion, 1);
+    read(sockfd, &serverManVersion, 1);
+    if (clientManVersion == serverManVersion) {
+      return;
+    }
+    read(clientManifestFD, &clientManVersion, 1);
+    read(sockfd, &serverManVersion, 1);
+    bzero(buff, 1024);
+    char serverManifest[manSizeConv];
+    bzero(serverManifest, manSizeConv);
+    char clientManifest[clientSize];
+    bzero(clientManifest, clientSize);
+    read(sockfd, serverManifest, manSizeConv);
+    read(clientManifestFD, clientManifest, clientSize);
+    printf("\n\n%s\n\n%s\n\n", serverManifest, clientManifest);
+ 
+    close(update);
+    close(clientManifestFD);
+  }
+  return;
 }
 
 struct manifest_entry{
@@ -434,7 +554,102 @@ void upgrade(int sockfd, char* project_name){
     
     chdir("..");
 }
-void push(int sockfd, char* project_name){
+void push(int connfd, char* project_name){
+    int len = strlen(project_name);
+    char titleLength[1024];
+    sprintf(titleLength, "%d", len);
+   
+    char request[1 + strlen(titleLength) + strlen(project_name)];
+    bzero(request, (1 + strlen(titleLength) + 1 + strlen(project_name)));
+    request[0] = 'p';
+ 
+    strcat(request, titleLength);
+    strcat(request, ":");
+    strcat(request, project_name);
+    write(connfd, request, strlen(request));
+    char result;
+    read(connfd, &result, 1);
+ 
+    int found = 0, qwe= 0;
+    int cfd, wfd;
+ 
+    if (result == 'e') {
+            printf("Error: %s could not be found\n", project_name);
+        return;
+    } else if (result == 's') {//project name exists on server
+            //check if .commit exists
+        DIR* directory = opendir("./");
+        struct dirent* file;
+        while (file = readdir(directory)){
+            if(strcmp(file->d_name,".Commit") ==0 )
+                found = 1;
+        }
+        if(found == 0){//no Commit file
+            printf("Client: error, no Commit file");
+            return;
+        }
+       
+        cfd = open(".Commit", O_RDONLY);
+        qwe = lseek(cfd, -1, SEEK_END);
+        lseek(cfd, 0, SEEK_SET);
+ 
+        char ctemp[qwe];
+        bzero(ctemp, qwe);
+        ctemp[qwe] ='\0';
+        read(cfd, ctemp, qwe);
+        write(connfd, ctemp, qwe);//send Commit to server
+       
+        char pathPro[strlen(project_name)+2];
+        sprintf(pathPro, "./%s",project_name);
+        chdir(pathPro);
+        DIR* pdir = opendir("./");
+        struct dirent* pfile;
+ 
+        lseek(cfd, 0,SEEK_SET);
+        char buf;
+        int sct;
+        while(read(cfd, &buf, 1) != 0){
+            if(buf == '.'){
+                sct = 0;
+                lseek(cfd, strlen(project_name) + 2, SEEK_CUR);
+                do{
+                    recv(cfd, &buf, 1, MSG_PEEK);
+                    sct++;
+                }while(buf != ' ');
+                   
+                char file_name[sct-1];
+                bzero(file_name, sct-1);
+                file_name[sct-1] = '\0';
+                read(cfd, &file_name, sct-1);
+ 
+                while(pfile = readdir(pdir)){
+                    if(pfile->d_type == 8 && strcmp(pfile->d_name, file_name) == 0){
+                        wfd =+ open(file_name, O_RDONLY);
+                        qwe = lseek(wfd, -1, SEEK_END);
+                        lseek(wfd, 0, SEEK_SET);
+                       
+                        char pl2[qwe];
+                        bzero(pl2, qwe);
+                        pl2[qwe] = '\0';
+                        read(wfd, &pl2, qwe);
+                        write(connfd, pl2, qwe);
+                    }
+                }
+            }
+        }
+        closedir(pdir);
+        chdir("..");
+ 
+    }
+  char pl3;
+  read(connfd, &pl3, 1);
+  if (pl3 == 's') {
+    printf("Client: push successful");
+  }else{
+    printf("Client: push error");
+  }
+    remove(".Commit");
+    return;
 }
 void destroy(int sockfd, char* project_name){
     int len = strlen(project_name);
