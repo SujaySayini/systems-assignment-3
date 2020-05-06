@@ -228,15 +228,95 @@ void checkout(int sockfd, char* project_name){
 }
 
 void upload(int sockfd,char* file_path){
-    //printf("upload\n");
     char* content;
     r_file(file_path,&content);
-    //printf("lol\n");
     char* message = (char*)(malloc(sizeof(char) * 12 + strlen(file_path) + strlen(content)));
     bzero(message,sizeof(char) * 12 + strlen(file_path) + strlen(content));
     sprintf(message,"u2:%d:%s:%d:%s;",strlen(file_path),file_path,strlen(content),content);
     printf("%s\n",message);
     write(sockfd,message,strlen(message));
+}
+
+int ten_pow(int power){
+    int tracker = 1;
+    int a;
+    for(a = 1;a <= power; a++){
+        tracker = tracker * 10;
+    }
+    return tracker;
+}
+
+int make_dir(char* path){
+    int depth = 0;
+    printf("HELLO\n");
+    int i = 0;
+    int tracker = 0;
+    char holder[PATH_MAX];
+    while(i < strlen(path)){
+        if(path[i] == '/'){
+            holder[tracker] = '\0';
+            printf("%s\n",holder);
+            depth++;
+            mkdir(holder,0777);
+            chdir(holder);
+            tracker = 0;
+        }
+        else{
+            holder[tracker] = path[i];
+            tracker++;
+        }
+        i++;
+    }
+    int a;
+    for(a = 0; a < depth; a++){
+        chdir("..");
+    }
+}
+
+void download(int sockfd,char* target_path,char* file_path){
+    char* message = (char*)(malloc(sizeof(char) * 12 + strlen(file_path)));
+    bzero(message,sizeof(char) * 12 + strlen(file_path));
+    sprintf(message,"x1:%d:%s;",strlen(file_path),file_path);
+    printf("%s\n",message);
+    write(sockfd,message,strlen(message));
+    char c;
+    read(sockfd,&c,1);
+    printf("%c code\n",c);
+    if(c == 'e'){
+    
+    }
+    else{
+        int num_bytes = 0;
+        int tracker = 0;
+        while(c != ':'){
+            read(sockfd,&c,1);
+            if(c != ':'){
+                num_bytes += (c - '0') * ten_pow(tracker);
+                tracker++;
+            }
+        }
+        int i;
+        char* content = (char*)malloc(sizeof(char) * num_bytes + 1);
+        int bytes_read = 0;
+        int read_status = 0;
+        while(read_status > -1 && bytes_read < num_bytes){
+            read_status = read(sockfd,content + bytes_read ,num_bytes - bytes_read);
+            bytes_read = bytes_read + read_status;
+        }
+        content[num_bytes] = '\0';
+        make_dir(target_path);
+        int fd = open(target_path, O_RDWR | O_TRUNC | O_CREAT,0644);
+        write(fd,content,strlen(content)); 
+    }
+}
+
+int stoi(char* x){
+    int a;
+    int total = 0;
+    for(a = 0;a < strlen(x);a++){
+        total += x[a] - '0' * ten_pow(a);
+    }
+    return total;
 }
 
 void create(int sockfd, char* project_name){
@@ -288,14 +368,73 @@ void removefd(int sockfd, char* project_name, char* file_name){
 void update(int sockfd, char* project_name){
 
 }
-void upgrade(int sockfd, char* project_name){
-
-}
 void commit(int sockfd, char* project_name){
+    download(sockfd,"project1/folder/test.txt","project1/test.txt");
+}
 
+struct manifest_entry{
+    int version;
+    char hash[64];
+    char path[PATH_MAX];
+    struct manifest_entry* next;
+};
+struct manifest_entry* parseManifest(char* content){
+    int tracker = 0;
+    int i = 0;
+    int holder_t = 0;
+    struct manifest_entry* head = (struct manifest_entry*) malloc(sizeof(struct manifest_entry));
+    struct manifest_entry* current = head;
+    while(i < strlen(content)){
+        if(content[i] == ' '){
+            if(tracker == 1){
+                current->path[holder_t] = '\0';
+                printf("%s\n",current->path);
+            }
+            holder_t = 0;
+            tracker++;
+        }
+        else if(content[i] == '\n'){
+            current->hash[holder_t] = '\0';
+            current->next = (struct manifest_entry*) malloc(sizeof(struct manifest_entry));
+            current = current->next;
+            tracker = 0;
+            holder_t = 0;
+        }
+        else{
+            if(tracker == 0){
+               current->version = current->version + (content[i] - '0')*ten_pow(holder_t);
+            }
+            else if(tracker == 1){
+                current->path[holder_t] = content[i];
+            }
+            else if(tracker == 2){
+                current->hash[holder_t] = content[i];
+            }
+            holder_t++;
+        }
+        i++;
+    }
+    return head;
+}
+
+void upgrade(int sockfd, char* project_name){
+    chdir(project_name);
+    char* manifest;
+    char* file_to_read = (char*) malloc(sizeof(char) * (strlen(project_name) + strlen(".Manifest")));
+    sprintf(file_to_read,"%s/.Manifest",project_name);
+    download(sockfd,".tmp",file_to_read);
+    r_file(".tmp",&manifest);
+    struct manifest_entry* manifest_str = parseManifest(manifest);
+    printf("%s\n",manifest);
+    char* update_c;
+    int status = r_file(".Update",&update_c);
+    if(status < 0){
+        printf("No .update file present!");
+    }
+    
+    chdir("..");
 }
 void push(int sockfd, char* project_name){
-
 }
 void destroy(int sockfd, char* project_name){
     int len = strlen(project_name);
@@ -534,8 +673,8 @@ int main(int argc, char **argv){
     } else if (string_equal(argv[1], "commit")){
         commit(sockfd, argv[2]);
     } else if (string_equal(argv[1], "push")){
-        upload(sockfd,"testersmile/lol.txt");       
-        //push(sockfd, argv[2]);
+        //upload(sockfd,"testersmile/lol.txt");       
+        push(sockfd, argv[2]);
     } else if (string_equal(argv[1], "create")){
         create(sockfd,argv[2]);
 

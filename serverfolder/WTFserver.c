@@ -39,7 +39,7 @@ int r_file(char * path,char** buff){
     int read_status = 0;
     stat(path,&stats);
     int bytesReadSoFar = 0, numOfBytes = stats.st_size;
-    *buff = (char*)malloc(sizeof(char) * numOfBytes); //before sizeof(char*) ?
+    *buff = (char*)malloc(sizeof(char) * numOfBytes + 1);
     bzero(*buff,numOfBytes);
     (*buff)[numOfBytes] = '\0';
     int fileD = open(path, O_RDONLY); 
@@ -48,12 +48,53 @@ int r_file(char * path,char** buff){
         read_status = read(fileD, *(buff + bytesReadSoFar), numOfBytes - bytesReadSoFar);
         bytesReadSoFar += read_status;
 
-    } while (read_status > 0 && bytesReadSoFar < numOfBytes); 
-    printf("buff is %s\n", *buff); 
+    } while (read_status > 0 && bytesReadSoFar < numOfBytes);
+    printf("%s",*buff);
     if(read_status > 0)
         return stats.st_size;
     return read_status;
+    /*
+    */
 
+}
+
+void download(int connfd,char** arguments){
+    char * filepath = arguments[0];
+    char * buff;
+    int size = r_file(filepath,&buff);
+    if(size < 0){
+
+    }
+    else{
+        char* message = (char*) malloc(sizeof(char) * size + 4);
+        sprintf(message,"s%d:%s;",size,buff);
+        printf("%s\n",message);
+        write(connfd,message,strlen(message));
+    }
+}
+
+int make_dir(char* path){
+    int depth = 0;
+    int i = 0;
+    int tracker = 0;
+    char holder[PATH_MAX];
+    while(i < strlen(path)){
+        if(path[i] == '/'){
+            holder[tracker] = '\0';
+            depth++;
+            chdir(holder);
+            tracker = 0;
+        }
+        else{
+            holder[tracker] = path[i];
+            tracker++;
+        }
+        i++;
+    }
+    int a;
+    for(a = 0; a < depth; a++){
+        chdir("..");
+    }
 }
 
 void upload(int connfd,char** arguments){
@@ -63,16 +104,12 @@ void upload(int connfd,char** arguments){
     int i = 0;
     int tracker = 0;
     char holder[PATH_MAX];
-    printf("%s arg\n",arguments[0]);
     while(i < strlen(arguments[0])){
-        printf("llooop\n");
         if(arguments[0][i] == '/'){
             holder[tracker] = '\0';
-            printf("status %d\n",mkdir(holder,0777));
             depth++;
             chdir(holder);
             tracker = 0;
-            printf("%s %d\n",holder,depth);
         }
         else{
             holder[tracker] = arguments[0][i];
@@ -84,7 +121,6 @@ void upload(int connfd,char** arguments){
     char final[100] = "./";
     strcat(final,holder);
     int fd = open(final, O_RDWR | O_TRUNC | O_CREAT, 0644);
-    printf("%s fd\n",arguments[1]);
     perror("");
     write(fd,arguments[1],strlen(arguments[1])); 
     int a;
@@ -168,7 +204,7 @@ void send_files(int connfd, char* folder_name){
             printf("file is %s\n", file);
             send_files(connfd, file);
 
-            write(connfd, 'b',1); // tell the client to go back in pwd since we finished all th files in this directory
+            write(connfd, "b",1); // tell the client to go back in pwd since we finished all th files in this directory
         }
         if(currentElement->d_type == 8){ //if its a file 
             //send files here
@@ -468,10 +504,14 @@ void switcher(void* connfd_in_voidptr){
         printf("%s\n", arguments[0]);
         //return -1;
         checkout(connfd,arguments);
-    } else if(command == 'r'){ // rollback
+    }else if(command == 'x'){
+        download(connfd,arguments);
+    }//download
+        else if(command == 'r'){ // rollback
         rollback(connfd, arguments);
     } else if(command == 'd'){ // destroy 
         destroy(connfd, arguments);
+    }else if(command == ' '){
     }else if (command == 'h'){ // history
         history(connfd, arguments);
     } else if (command == 'v'){ //current version
